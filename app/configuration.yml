@@ -1,0 +1,8 @@
+# LOG_LEVEL
+# a value of (NOSET, DEBUG, INFO, WARNING, ERROR, CRITICAL)
+# default NOSET
+log_level: INFO
+console: true
+
+parallel: 10
+threads: 2
