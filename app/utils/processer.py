@@ -6,6 +6,7 @@ Created on 2016-12-23
 import os
 import json
 import logging
+import threading
 from threading import Thread
 from multiprocessing import Process, Queue
 
@@ -17,8 +18,25 @@ LOG = logging.getLogger(__name__)
 TaskQueue = Queue(5000)
 ResultQueue = Queue(5000)
 
-class Processer(Thread):
+class StoppableThread(Thread):
+    """
+    Thread class with a stop() method. The thread itself has to check
+    regularly for the stopped() condition.
+    """
+
+    def __init__(self):
+        super(StoppableThread, self).__init__()
+        self._stop = threading.Event()
+
+    def stop(self):
+        self._stop.set()
+
+    def stopped(self):
+        return self._stop.isSet()
+
+class Processer(StoppableThread):
     def __init__(self, pid, task_queue, result_queue, mapping):
+        StoppableThread.__init__(self)
         Thread.__init__(self)
         self.pid = pid
         self.task_queue = task_queue
@@ -30,16 +48,20 @@ class Processer(Thread):
         LOG.info("Processer(%03d) start", self.pid)
         try:
             while True:
-                task = self.task_queue.get()
-                if task != "mission_complete":
-                    cmd, job = task
-                    LOG.debug("processing task: %s", task)
-                    processer = self.mapping.get(cmd)
-                    if processer:
-                        r = processer.map(job)
-                        self.result_queue.put(r)
-                    LOG.debug("processed task: %s", cmd)
+                if not self.stopped():
+                    task = self.task_queue.get()
+                    if task != "mission_complete":
+                        cmd, job = task
+                        LOG.debug("processing task: %s", task)
+                        processer = self.mapping.get(cmd)
+                        if processer:
+                            r = processer.map(job)
+                            self.result_queue.put(r)
+                        LOG.debug("processed task: %s", cmd)
+                    else:
+                        break
                 else:
+                    LOG.info("Processer(%03d) exit by signal!", self.pid)
                     break
             self.task_queue.put("mission_complete")
         except Exception, e:
