@@ -19,3 +19,7 @@ class Mapping(object):
         if self.mapping.has_key(name):
             result = self.mapping[name]
         return result
+
+    def iter(self):
+        for name in self.mapping:
+            yield (name, self.mapping[name])

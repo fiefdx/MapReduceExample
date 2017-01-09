@@ -5,6 +5,7 @@ Created on 2016-12-23
 
 import os
 import json
+import signal
 import logging
 import threading
 from threading import Thread
@@ -15,8 +16,8 @@ import logger
 
 LOG = logging.getLogger(__name__)
 
-TaskQueue = Queue(5000)
-ResultQueue = Queue(5000)
+TaskQueue = Queue(CONFIG["parallel"] * CONFIG["threads"] * 2)
+ResultQueue = Queue(CONFIG["parallel"] * CONFIG["threads"] * 2)
 StopSignal = "mission_complete"
 
 class StoppableThread(Thread):
@@ -77,6 +78,9 @@ class Worker(Process):
         self.result_queue = result_queue
         self.mapping = mapping
 
+    def sig_handler(self, sig, frame):
+        LOG.warning("Worker(%03d) Caught signal: %s", self.wid, sig)
+
     def run(self):
         logger.config_logging(logger_name = "worker",
                               file_name = ("worker_%s" % self.wid + ".log"),
@@ -92,6 +96,8 @@ class Worker(Process):
         LOG.propagate = False
         LOG.info("Worker(%03d) start", self.wid)
         try:
+            signal.signal(signal.SIGTERM, self.sig_handler)
+            signal.signal(signal.SIGINT, self.sig_handler)
             threads = []
             for i in xrange(CONFIG["threads"]):
                 t = Processer(i, self.task_queue, self.result_queue, self.mapping)
@@ -106,6 +112,49 @@ class Worker(Process):
             LOG.exception(e)
         LOG.info("Worker(%03d) exit", self.wid)
 
+class Dispatcher(Process):
+    def __init__(self, task_queue, mapping):
+        Process.__init__(self)
+        self.task_queue = task_queue
+        self.mapping = mapping
+        self.stop = False
+
+    def sig_handler(self, sig, frame):
+        LOG.warning("Dispatcher Caught signal: %s", sig)
+        self.stop = True
+
+    def run(self):
+        logger.config_logging(logger_name = "dispatcher",
+                              file_name = "dispatcher.log",
+                              log_level = CONFIG["log_level"],
+                              dir_name = CONFIG["log_path"],
+                              day_rotate = False,
+                              when = "D",
+                              interval = 1,
+                              max_size = 20,
+                              backup_count = 5,
+                              console = True)
+        LOG = logging.getLogger("dispatcher")
+        LOG.propagate = False
+        LOG.info("Dispatcher start")
+        try:
+            signal.signal(signal.SIGTERM, self.sig_handler)
+            signal.signal(signal.SIGINT, self.sig_handler)
+            for name, task_processer in self.mapping.iter():
+                LOG.info("dispatch: %s", name)
+                if not self.stop:
+                    for task in task_processer.iter():
+                        if not self.stop:
+                            self.task_queue.put(task)
+                        else:
+                            break
+                else:
+                    break
+        except Exception, e:
+            LOG.exception(e)
+        self.task_queue.put(StopSignal)
+        LOG.info("Dispatcher exit")
+
 class Collector(Process):
     def __init__(self, data_queue, result_file_name, mapping):
         Process.__init__(self)
@@ -113,6 +162,9 @@ class Collector(Process):
         self.datas = {}
         self.result_file_name = result_file_name
         self.mapping = mapping
+
+    def sig_handler(self, sig, frame):
+        LOG.warning("Collector Caught signal: %s", sig)
 
     def run(self):
         logger.config_logging(logger_name = "collector",
@@ -129,6 +181,8 @@ class Collector(Process):
         LOG.propagate = False
         LOG.info("Collector start")
         try:
+            signal.signal(signal.SIGTERM, self.sig_handler)
+            signal.signal(signal.SIGINT, self.sig_handler)
             while True:
                 data = self.data_queue.get()
                 LOG.debug("get data: %s", data)

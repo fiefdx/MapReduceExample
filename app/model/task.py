@@ -6,12 +6,11 @@ Created on 2016-12-22
 class TaskProcesser(object):
     name = ""
 
-    @classmethod
-    def prepare(cls, x):
-        return (cls.name, x)
-
     def __init__(self):
         pass
+
+    def iter(self):
+        yield (self.name, None)
 
     def map(self, x):
         return (self.name, x)
@@ -24,6 +23,10 @@ class SumProcesser(TaskProcesser):
 
     def __init__(self):
         pass
+
+    def iter(self):
+        for x in xrange(10000000000):
+            yield (self.name, x)
 
     def map(self, x):
         return (self.name, x)

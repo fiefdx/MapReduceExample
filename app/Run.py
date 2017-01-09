@@ -5,15 +5,19 @@ Created on 2016-12-22
 
 import logging
 import time
+import signal
 
 from config import CONFIG
-from utils.processer import TaskQueue, ResultQueue, Worker, Collector, StopSignal
+from utils.processer import TaskQueue, ResultQueue, Worker, Collector, Dispatcher, StopSignal
 from model.task import SumProcesser
 from model.mapping import Mapping
 import logger
 
 LOG = logging.getLogger(__name__)
 
+def sig_handler(sig, frame):
+    LOG.warning("Caught signal: %s", sig)
+    TaskQueue.put(StopSignal)
 
 if __name__ == "__main__":
     logger.config_logging(
@@ -33,26 +37,29 @@ if __name__ == "__main__":
     mapping = Mapping()
     mapping.add(SumProcesser())
 
-    processes = []
+    workers = []
     for i in xrange(CONFIG["parallel"]):
-        p = Worker(i, TaskQueue, ResultQueue, mapping)
-        processes.append(p)
+        w = Worker(i, TaskQueue, ResultQueue, mapping)
+        workers.append(w)
 
-    c = Collector(ResultQueue, "test", mapping)
+    c = Collector(ResultQueue, CONFIG["result_file_name"], mapping)
     c.start()
 
-    for p in processes:
-        p.start()
+    d = Dispatcher(TaskQueue, mapping)
+    d.start()
 
-    for x in xrange(10):
-        TaskQueue.put(SumProcesser.prepare(x))
-    TaskQueue.put(StopSignal)
+    for w in workers:
+        w.start()
 
-    for p in processes:
-        p.join()
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGINT, sig_handler)
+
+    for w in workers:
+        w.join()
 
     ResultQueue.put(StopSignal)
     c.join()
+    d.join()
 
     end_time = time.time()
     LOG.info("End Script\nUse Time: %ss", end_time - start_time)

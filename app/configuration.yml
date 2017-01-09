@@ -6,3 +6,5 @@ console: true
 
 parallel: 10
 threads: 2
+
+result_file_name: test
