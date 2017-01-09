@@ -8,7 +8,7 @@ import time
 
 from config import CONFIG
 from utils.processer import TaskQueue, ResultQueue, Worker, Collector
-from model.task import SumTask, SumProcesser
+from model.task import SumProcesser
 from model.mapping import Mapping
 import logger
 
@@ -45,7 +45,7 @@ if __name__ == "__main__":
         p.start()
 
     for x in xrange(10):
-        TaskQueue.put(SumTask(x).prepare())
+        TaskQueue.put(SumProcesser.prepare(x))
     TaskQueue.put("mission_complete")
 
     for p in processes:
@@ -56,4 +56,3 @@ if __name__ == "__main__":
 
     end_time = time.time()
     LOG.info("End Script\nUse Time: %ss", end_time - start_time)
-    

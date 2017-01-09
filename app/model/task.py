@@ -3,17 +3,15 @@
 Created on 2016-12-22
 '''
 
-class Task(object):
-    def __init__(self, x):
-        self.name = ""
-        self.x = x
-
-    def prepare(self):
-        return (self.name, self.x)
-
 class TaskProcesser(object):
+    name = ""
+
+    @classmethod
+    def prepare(cls, x):
+        return (cls.name, x)
+
     def __init__(self):
-        self.name = ""
+        pass
 
     def map(self, x):
         return (self.name, x)
@@ -21,17 +19,11 @@ class TaskProcesser(object):
     def reduce(self, x, y):
         return x
 
-class SumTask(Task):
-    def __init__(self, x):
-        self.name = "sum"
-        self.x = x
-
-    def prepare(self):
-        return (self.name, self.x)
-
 class SumProcesser(TaskProcesser):
+    name = "sum"
+
     def __init__(self):
-        self.name = "sum"
+        pass
 
     def map(self, x):
         return (self.name, x)
