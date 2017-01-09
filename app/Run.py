@@ -7,7 +7,7 @@ import logging
 import time
 
 from config import CONFIG
-from utils.processer import TaskQueue, ResultQueue, Worker, Collector
+from utils.processer import TaskQueue, ResultQueue, Worker, Collector, StopSignal
 from model.task import SumProcesser
 from model.mapping import Mapping
 import logger
@@ -46,12 +46,12 @@ if __name__ == "__main__":
 
     for x in xrange(10):
         TaskQueue.put(SumProcesser.prepare(x))
-    TaskQueue.put("mission_complete")
+    TaskQueue.put(StopSignal)
 
     for p in processes:
         p.join()
 
-    ResultQueue.put("mission_complete")
+    ResultQueue.put(StopSignal)
     c.join()
 
     end_time = time.time()

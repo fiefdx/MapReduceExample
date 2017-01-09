@@ -17,6 +17,7 @@ LOG = logging.getLogger(__name__)
 
 TaskQueue = Queue(5000)
 ResultQueue = Queue(5000)
+StopSignal = "mission_complete"
 
 class StoppableThread(Thread):
     """
@@ -50,7 +51,7 @@ class Processer(StoppableThread):
             while True:
                 if not self.stopped():
                     task = self.task_queue.get()
-                    if task != "mission_complete":
+                    if task != StopSignal:
                         cmd, job = task
                         LOG.debug("processing task: %s", task)
                         processer = self.mapping.get(cmd)
@@ -63,7 +64,7 @@ class Processer(StoppableThread):
                 else:
                     LOG.info("Processer(%03d) exit by signal!", self.pid)
                     break
-            self.task_queue.put("mission_complete")
+            self.task_queue.put(StopSignal)
         except Exception, e:
             LOG.exception(e)
         LOG.info("Processer(%03d) exit", self.pid)
@@ -131,7 +132,7 @@ class Collector(Process):
             while True:
                 data = self.data_queue.get()
                 LOG.debug("get data: %s", data)
-                if data != "mission_complete":
+                if data != StopSignal:
                     if self.datas.has_key(data[0]):
                         self.datas[data[0]] = self.mapping.get(data[0]).reduce(data[1], self.datas[data[0]])
                     else:
